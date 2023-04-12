@@ -27,6 +27,7 @@ type Config struct {
 	KeyFile  string `yaml:"key"`
 	Upstream string `yaml:"upstream"`
 	Addr     string `yaml:"addr"`
+	SocksProxy string `yaml:"socks"`
 }
 
 var (
@@ -41,10 +42,11 @@ func getConfig() (config *Config, err error) {
 	flag.StringVar(&cfg.CertFile, "cert", "", "path to cert file")
 	flag.StringVar(&cfg.KeyFile, "key", "", "path to key file")
 	flag.BoolVar(&version, "version", false, "print version string and exit")
+	flag.StringVar(&cfg.SocksProxy, "socks", "", "SocksProxy url")
 
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(),
-			"usage: %s -c [config.yml] [-addr host:port] -cert certfile -key keyfile [-version] upstream\n",
+			"usage: %s -c [config.yml] [-addr host:port] -cert certfile -key keyfile [-socks url] [-version] upstream\n",
 			filepath.Base(os.Args[0]))
 		flag.PrintDefaults()
 		fmt.Fprintln(flag.CommandLine.Output(), "  upstream string\n    \tupstream url")
@@ -52,7 +54,7 @@ func getConfig() (config *Config, err error) {
 	flag.Parse()
 
 	if version {
-		fmt.Fprintln(flag.CommandLine.Output(), Version)
+		fmt.Fprintln(flag.CommandLine.Output(), version)
 		os.Exit(0)
 	}
 
@@ -145,9 +147,17 @@ func _main() error {
 		}
 	}
 
+	socksProxy, err := url.Parse(cfg.SocksProxy)
+	if err != nil {
+		fmt.Errorf("invalid socks proxy address: %v", err)
+	}
+
 	srv := http.Server{
 		Handler: &httputil.ReverseProxy{
 			Director: director,
+			Transport: &http.Transport {
+				Proxy: http.ProxyURL(socksProxy),
+			},
 		},
 		Addr: cfg.Addr,
 	}
